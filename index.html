@@ -315,6 +315,11 @@ html,body{height:100%;background:var(--cream);color:var(--text);font-family:'Int
 </html>
 <script>
 const RENTCAST_KEY = 'a31ea82de26d45c0b76a445ffaeb2eca';
+const PROXY = 'https://deal-analyzer.colton-rickman.workers.dev/?url=';
+
+function proxied(url) {
+  return PROXY + encodeURIComponent(url);
+}
 const fmt = n => '$' + Math.round(n).toLocaleString();
 
 const rehabDefs = [
@@ -351,20 +356,11 @@ function setStatus(msg) {
 }
 
 async function rentcastFetch(path) {
-  const PROXY = 'https://corsproxy.io/?url=';
-  const direct = 'https://api.rentcast.io' + path;
+  const url = proxied('https://api.rentcast.io' + path);
   const headers = {'X-Api-Key': RENTCAST_KEY, 'Accept': 'application/json'};
-  let res;
-  try {
-    res = await fetch(direct, {headers});
-    if (!res.ok) throw new Error('status ' + res.status);
-    return res.json();
-  } catch(e) {
-    console.warn('Direct blocked, using proxy:', e.message);
-    res = await fetch(PROXY + encodeURIComponent(direct), {headers});
-    if (!res.ok) throw new Error('Rentcast proxy error ' + res.status);
-    return res.json();
-  }
+  const res = await fetch(url, {headers});
+  if (!res.ok) throw new Error('Rentcast error ' + res.status);
+  return res.json();
 }
 
 async function fetchProperty(address) {
@@ -421,15 +417,8 @@ Return exactly this JSON structure:
 condition must be one of: poor, fair, good. Calculate ARV from the actual comps if available.`;
 
   const body = JSON.stringify({model:'claude-sonnet-4-6', max_tokens:1000, messages:[{role:'user', content:prompt}]});
-  let res;
-  try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {method:'POST', headers:{'Content-Type':'application/json'}, body});
-    if (!res.ok) throw new Error('direct ' + res.status);
-  } catch(e) {
-    console.warn('Anthropic direct blocked, trying allorigins proxy:', e.message);
-    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages');
-    res = await fetch(proxy, {method:'POST', headers:{'Content-Type':'application/json'}, body});
-  }
+  const url = proxied('https://api.anthropic.com/v1/messages');
+  const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body});
   if (!res.ok) throw new Error('AI call failed: ' + res.status);
   const raw = await res.json();
   const txt = raw.content.map(c => c.text||'').join('');
