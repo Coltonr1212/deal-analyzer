@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deal Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0D1B2A;
+  --navy-mid:#1A2D42;
+  --navy-light:#243650;
+  --gold:#C9A84C;
+  --gold-light:#E8C97A;
+  --gold-dim:#7A6030;
+  --cream:#F7F4EE;
+  --cream-dark:#EDE9E0;
+  --text:#0D1B2A;
+  --text-muted:#5A6473;
+  --text-light:#8A95A0;
+  --border:#D8D2C6;
+  --white:#FFFFFF;
+  --green:#1A7A4A;
+  --green-bg:#EAF5EE;
+  --red:#C0392B;
+  --red-bg:#FAEAEA;
+  --amber:#A0620A;
+  --amber-bg:#FEF4E4;
+}
+
+html,body{height:100%;background:var(--cream);color:var(--text);font-family:'Inter',sans-serif;font-size:15px}
+
+/* ── Layout ── */
+.shell{display:grid;grid-template-rows:64px 1fr;height:100vh}
+.topbar{background:var(--navy);display:flex;align-items:center;padding:0 2rem;gap:1rem;border-bottom:1px solid var(--navy-light)}
+.logo{font-family:'DM Serif Display',serif;font-size:22px;color:var(--gold);letter-spacing:-.5px}
+.logo span{color:rgba(255,255,255,0.5);font-family:'Inter',sans-serif;font-size:13px;font-weight:400;margin-left:8px}
+.main{display:grid;grid-template-columns:1fr 420px;overflow:hidden}
+
+/* ── Left panel ── */
+.left{display:flex;flex-direction:column;overflow:hidden}
+.search-area{padding:1.5rem 2rem;background:var(--white);border-bottom:1px solid var(--border)}
+.search-label{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px}
+.search-row{display:flex;gap:8px}
+.search-row input{flex:1;padding:11px 16px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:'Inter',sans-serif;color:var(--text);background:var(--cream);transition:border-color .15s}
+.search-row input:focus{outline:none;border-color:var(--gold);background:var(--white)}
+.search-row input::placeholder{color:var(--text-light)}
+.btn{padding:11px 20px;background:var(--navy);color:var(--gold);border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;letter-spacing:.02em;transition:background .15s}
+.btn:hover{background:var(--navy-mid)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color .15s,background .15s}
+.btn-outline:hover{border-color:var(--gold);background:var(--cream)}
+
+/* ── Photo area ── */
+.photo-area{flex:1;position:relative;overflow:hidden;background:var(--navy-mid)}
+.photo-area img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-overlay{position:absolute;inset:0;background:linear-gradient(to top, rgba(13,27,42,.85) 0%, rgba(13,27,42,.1) 60%, transparent 100%)}
+.photo-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:rgba(255,255,255,.3)}
+.photo-placeholder svg{width:64px;height:64px;opacity:.4}
+.photo-placeholder p{font-size:14px}
+.photo-meta{position:absolute;bottom:0;left:0;right:0;padding:1.5rem 2rem}
+.prop-address{font-family:'DM Serif Display',serif;font-size:26px;color:var(--white);line-height:1.2;margin-bottom:6px}
+.prop-sub{font-size:13px;color:rgba(255,255,255,.6);display:flex;gap:16px}
+.prop-sub span{display:flex;align-items:center;gap:4px}
+.dom-badge{display:inline-flex;align-items:center;gap:5px;background:var(--gold);color:var(--navy);font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;position:absolute;top:1.25rem;left:1.5rem}
+
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-light);padding:2rem}
+.empty-state svg{width:56px;height:56px;opacity:.25}
+.empty-state p{font-size:14px;text-align:center;max-width:260px;line-height:1.6}
+
+/* ── Right panel ── */
+.right{background:var(--white);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.right-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-light);padding:2rem;text-align:center}
+.right-empty svg{width:48px;height:48px;opacity:.2}
+.right-empty p{font-size:13px;max-width:200px;line-height:1.6}
+
+.panel-header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--white);z-index:10}
+.panel-header h2{font-family:'DM Serif Display',serif;font-size:18px}
+.status-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--green-bg);color:var(--green)}
+
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.kpi{background:var(--white);padding:14px 16px}
+.kpi-label{font-size:11px;color:var(--text-muted);font-weight:500;margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase}
+.kpi-value{font-size:22px;font-weight:600;line-height:1}
+.kpi-sub{font-size:11px;color:var(--text-light);margin-top:3px}
+.kpi.green .kpi-value{color:var(--green)}
+.kpi.amber .kpi-value{color:var(--amber)}
+.kpi.red .kpi-value{color:var(--red)}
+.kpi.gold .kpi-value{color:var(--gold-dim)}
+
+.section{padding:1rem 1.5rem;border-bottom:1px solid var(--border)}
+.section-title{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.section-title svg{width:14px;height:14px}
+
+/* Rehab rows */
+.rehab-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--cream-dark);font-size:13px}
+.rehab-item:last-of-type{border-bottom:none}
+.rehab-name{color:var(--text-muted)}
+.rehab-val{font-weight:500;color:var(--text)}
+.rehab-total{display:flex;justify-content:space-between;font-size:13px;font-weight:600;padding:8px 12px;background:var(--cream);border-radius:6px;margin-top:8px}
+
+/* Comps */
+.comp-item{padding:8px 0;border-bottom:1px solid var(--cream-dark);font-size:12px}
+.comp-item:last-child{border-bottom:none}
+.comp-addr{font-weight:500;color:var(--text);margin-bottom:3px}
+.comp-detail{display:flex;justify-content:space-between;color:var(--text-muted)}
+.comp-price{font-weight:600;color:var(--text)}
+.badge{font-size:10px;font-weight:600;padding:2px 6px;border-radius:10px;text-transform:uppercase}
+.badge.sold{background:var(--green-bg);color:var(--green)}
+.badge.active{background:var(--amber-bg);color:var(--amber)}
+
+/* Trends */
+.trend-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--cream-dark);font-size:12px}
+.trend-item:last-child{border-bottom:none}
+.trend-label{color:var(--text-muted)}
+.trend-right{text-align:right}
+.trend-val{font-weight:500;color:var(--text)}
+.trend-chg{font-size:11px}
+.up{color:var(--green)}
+.dn{color:var(--red)}
+
+/* Analysis */
+.analysis-text{font-size:13px;line-height:1.75;color:var(--text-muted)}
+
+/* Spread bar */
+.spread-bar-wrap{margin-top:8px}
+.spread-bar-track{height:6px;background:var(--cream-dark);border-radius:3px;overflow:hidden}
+.spread-bar-fill{height:100%;border-radius:3px;background:var(--green);transition:width .4s}
+.spread-bar-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-light);margin-top:4px}
+
+/* Sources */
+.sources{display:flex;flex-wrap:wrap;gap:5px;padding:1rem 1.5rem}
+.src{font-size:10px;padding:3px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text-light)}
+.src.live{border-color:var(--green);color:var(--green)}
+
+/* Loading */
+.loading-bar{height:3px;background:var(--cream-dark);overflow:hidden;position:relative}
+.loading-bar-fill{position:absolute;left:-40%;width:40%;height:100%;background:var(--gold);animation:slide 1s linear infinite}
+@keyframes slide{to{left:100%}}
+
+/* Scrollbar */
+.right::-webkit-scrollbar{width:4px}
+.right::-webkit-scrollbar-track{background:transparent}
+.right::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+@media(max-width:900px){
+  .main{grid-template-columns:1fr}
+  .right{border-left:none;border-top:1px solid var(--border);max-height:60vh}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo">DealScope <span>Real Estate Deal Analyzer</span></div>
+  </div>
+
+  <div class="main">
+    <!-- Left panel -->
+    <div class="left">
+      <div class="search-area">
+        <div class="search-label">Property address</div>
+        <div class="search-row">
+          <input type="text" id="addr" placeholder="123 Main St, Lansing, MI 48912" />
+          <button class="btn" id="analyzeBtn" onclick="analyze()">Analyze →</button>
+        </div>
+        <div id="statusMsg" style="font-size:12px;color:var(--text-light);margin-top:8px;min-height:16px"></div>
+      </div>
+
+      <!-- Photo / empty -->
+      <div id="photoArea" class="photo-area" style="display:none;position:relative">
+        <img id="propImg" src="" alt="Property photo" />
+        <div class="photo-overlay"></div>
+        <div class="dom-badge" id="domBadge">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span id="domText">— days on market</span>
+        </div>
+        <div class="photo-meta">
+          <div class="prop-address" id="propAddress">—</div>
+          <div class="prop-sub" id="propSub"></div>
+        </div>
+      </div>
+
+      <div id="emptyLeft" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <p>Enter a property address above to generate a full deal analysis</p>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="right" id="rightPanel">
+      <div class="right-empty" id="rightEmpty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+        <p>Deal details will appear here after you analyze a property</p>
+      </div>
+
+      <div id="rightContent" style="display:none;flex-direction:column;flex:1">
+        <div class="loading-bar" id="loadBar" style="display:none"><div class="loading-bar-fill"></div></div>
+
+        <div class="panel-header">
+          <h2>Deal summary</h2>
+          <div class="status-pill" id="dealTag">—</div>
+        </div>
+
+        <!-- KPI grid -->
+        <div class="kpi-grid">
+          <div class="kpi gold">
+            <div class="kpi-label">List price</div>
+            <div class="kpi-value" id="kListPrice">—</div>
+            <div class="kpi-sub" id="kPriceSub">—</div>
+          </div>
+          <div class="kpi green">
+            <div class="kpi-label">ARV (comps)</div>
+            <div class="kpi-value" id="kArv">—</div>
+            <div class="kpi-sub" id="kArvSub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Est. rehab</div>
+            <div class="kpi-value" id="kRehab">—</div>
+            <div class="kpi-sub" id="kRehabSub">—</div>
+          </div>
+          <div class="kpi" id="kSpreadCard">
+            <div class="kpi-label">Equity spread</div>
+            <div class="kpi-value" id="kSpread">—</div>
+            <div class="kpi-sub">ARV − price − rehab</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Est. rent / mo</div>
+            <div class="kpi-value" id="kRent">—</div>
+            <div class="kpi-sub">Zillow / Rentometer est.</div>
+          </div>
+          <div class="kpi" id="kYieldCard">
+            <div class="kpi-label">Gross yield</div>
+            <div class="kpi-value" id="kYield">—</div>
+            <div class="kpi-sub">Annual rent ÷ ARV</div>
+          </div>
+        </div>
+
+        <!-- Rehab breakdown -->
+        <div class="section">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            Rehab estimate
+          </div>
+          <div id="rehabList"></div>
+        </div>
+
+        <!-- Spread bar -->
+        <div class="section">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            Deal strength
+          </div>
+          <div class="spread-bar-wrap">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+              <span style="color:var(--text-muted)">All-in cost</span>
+              <span id="allinCost" style="font-weight:600">—</span>
+            </div>
+            <div class="spread-bar-track"><div class="spread-bar-fill" id="spreadBarFill" style="width:0%"></div></div>
+            <div class="spread-bar-labels"><span id="barLeft">—</span><span>ARV: <span id="barRight">—</span></span></div>
+          </div>
+          <div style="font-size:12px;color:var(--text-light);margin-top:8px" id="dealNote">—</div>
+        </div>
+
+        <!-- Comps -->
+        <div class="section">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Comparable sales — last 6 months
+          </div>
+          <div id="compsList"></div>
+        </div>
+
+        <!-- Market trends -->
+        <div class="section">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Market trends
+          </div>
+          <div id="trendList"></div>
+        </div>
+
+        <!-- AI analysis -->
+        <div class="section">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            AI deal analysis
+          </div>
+          <div class="analysis-text" id="aiText">—</div>
+        </div>
+
+        <!-- Data sources -->
+        <div class="sources">
+          <div class="src live">AI analysis: live</div>
+          <div class="src">MLS: API key needed</div>
+          <div class="src">Zillow: Bridge API</div>
+          <div class="src">Rentometer: paid API</div>
+          <div class="src">County assessor: varies</div>
+        </div>
+
+        <div style="padding:.75rem 1.5rem 1.5rem;font-size:11px;color:var(--text-light);line-height:1.6;border-top:1px solid var(--border);margin-top:auto">
+          ⚠️ Estimates are AI-generated for deal screening only. Connect Estated, Attom Data, or Bridge Interactive APIs for live MLS data. Always verify with a local agent and licensed contractor before purchasing.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const RENTCAST_KEY = 'a31ea82de26d45c0b76a445ffaeb2eca';
+const fmt = n => '$' + Math.round(n).toLocaleString();
+
+const rehabDefs = [
+  {key:'roof',label:'Roof',low:4000,high:14000,u:'lump'},
+  {key:'hvac',label:'HVAC system',low:3500,high:8000,u:'lump'},
+  {key:'kitchen',label:'Kitchen',low:5000,high:18000,u:'lump'},
+  {key:'baths',label:'Bathrooms',low:2500,high:8000,u:'bath'},
+  {key:'floors',label:'Flooring',low:2,high:8,u:'sqft'},
+  {key:'paint',label:'Interior paint',low:1,high:3,u:'sqft'},
+  {key:'electric',label:'Electrical',low:1500,high:6000,u:'lump'},
+  {key:'plumbing',label:'Plumbing',low:500,high:4000,u:'lump'},
+  {key:'exterior',label:'Exterior / landscape',low:1000,high:5000,u:'lump'},
+  {key:'windows',label:'Windows',low:300,high:700,u:'window'},
+];
+
+function calcRehab(sqft, baths, condition) {
+  const m = condition==='poor'?0.9:condition==='fair'?0.55:0.25;
+  let total = 0;
+  const lines = [];
+  rehabDefs.forEach(r => {
+    let est;
+    if(r.u==='sqft') est = Math.round((r.low+(r.high-r.low)*m)*(sqft||1200));
+    else if(r.u==='bath') est = Math.round((r.low+(r.high-r.low)*m)*(baths||2));
+    else if(r.u==='window') est = Math.round((r.low+(r.high-r.low)*m)*8);
+    else est = Math.round(r.low+(r.high-r.low)*m);
+    total += est;
+    lines.push({label:r.label, val:est});
+  });
+  return {total, lines};
+}
+
+function setStatus(msg) {
+  document.getElementById('statusMsg').textContent = msg;
+}
+
+async function rentcastFetch(path) {
+  const PROXY = 'https://corsproxy.io/?url=';
+  const direct = 'https://api.rentcast.io' + path;
+  const headers = { 'X-Api-Key': RENTCAST_KEY, 'Accept': 'application/json' };
+  let res;
+  try {
+    res = await fetch(direct, { headers });
+    if (!res.ok) throw new Error('direct ' + res.status);
+  } catch(e) {
+    console.warn('Direct Rentcast blocked, using CORS proxy:', e.message);
+    res = await fetch(PROXY + encodeURIComponent(direct), { headers });
+  }
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error('Rentcast ' + res.status + ': ' + body.slice(0,120));
+  }
+  return res.json();
+}
+
+async function fetchRentcastProperty(address) {
+  const data = await rentcastFetch('/v1/properties?address=' + encodeURIComponent(address) + '&limit=1');
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function fetchRentcastComps(address, bedrooms, bathrooms, sqft) {
+  const p = new URLSearchParams({
+    address, bedrooms: bedrooms||3, bathrooms: bathrooms||2,
+    squareFootage: sqft||1200, maxRadius: 1, daysOld: 180, limit: 6, compCount: 6
+  });
+  return rentcastFetch('/v1/avm/sale/comparables?' + p);
+}
+
+async function fetchRentcastRentEstimate(address, bedrooms, bathrooms, sqft) {
+  const p = new URLSearchParams({
+    address, bedrooms: bedrooms||3, bathrooms: bathrooms||2, squareFootage: sqft||1200
+  });
+  return rentcastFetch('/v1/avm/rent/long-term?' + p);
+}
+
+async function fetchRentcastMarket(zipCode) {
+  try { return await rentcastFetch('/v1/markets?zipCode=' + zipCode); }
+  catch(e) { console.warn('Market data unavailable:', e.message); return null; }
+}
+
+async function fetchAIAnalysis(addr, propData, compsData, rentData, marketData) {
+  const prompt = `You are a real estate investment analyst. Analyze this deal and return ONLY valid JSON, no markdown.
+
+Property: ${addr}
+Details: ${JSON.stringify(propData)}
+Sold comps (last 6 months): ${JSON.stringify(compsData)}
+Rent estimate: ${JSON.stringify(rentData)}
+Market data: ${JSON.stringify(marketData)}
+
+Return this exact JSON structure:
+{
+  "condition": "fair",
+  "conditionNote": "brief note on condition based on year built",
+  "arv": 240000,
+  "arvNote": "based on X comps averaging $Y/sqft",
+  "marketTrends": [
+    {"label":"Median sold price","value":"$237,500","change":"+4.2%","dir":"up"},
+    {"label":"Avg days on market","value":"18 days","change":"-3 days","dir":"dn"},
+    {"label":"List-to-sale ratio","value":"98.5%","change":"+1.1%","dir":"up"},
+    {"label":"Active inventory","value":"142 homes","change":"-12%","dir":"dn"},
+    {"label":"Price per sqft","value":"$162","change":"+6.1%","dir":"up"}
+  ],
+  "dealAnalysis": "3-4 sentence investor-focused analysis covering deal quality, risks, and a clear recommendation."
+}
+
+For ARV: calculate from the actual comps provided, adjusted for sqft. condition must be: poor, fair, or good — infer from year built and property type. Market trends: use the real market data if available, otherwise estimate for the area.`;
+
+  // Anthropic doesn't allow direct browser calls — use a relay
+  const AI_PROXY = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages');
+  let res;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  const raw = await res.json();
+  const txt = raw.content.map(c => c.text || '').join('');
+  return JSON.parse(txt.replace(/```json|```/g, '').trim());
+}
+
+function renderDashboard(addr, prop, compsRaw, rentRaw, aiData) {
+  // Property basics — from Rentcast or AI fallback
+  const beds = prop?.bedrooms || 3;
+  const baths = prop?.bathrooms || 2;
+  const sqft = prop?.squareFootage || 1200;
+  const yearBuilt = prop?.yearBuilt || '—';
+  const listPrice = prop?.price || prop?.lastSalePrice || 0;
+  const dom = prop?.daysOnMarket || prop?.listingDaysOnMarket || '—';
+
+  // Comps — from Rentcast
+  const comps = (compsRaw?.comparables || []).map(c => ({
+    address: c.formattedAddress || c.address,
+    beds: c.bedrooms,
+    baths: c.bathrooms,
+    sqft: c.squareFootage,
+    soldPrice: c.price || c.lastSalePrice || 0,
+    daysAgo: c.daysOld || 0,
+    status: 'sold'
+  }));
+
+  // Rent — from Rentcast
+  const estRent = rentRaw?.rent || rentRaw?.rentEstimate || 0;
+
+  // ARV + analysis from AI
+  const arv = aiData.arv || 0;
+  const condition = aiData.condition || 'fair';
+
+  // Rehab
+  const rehab = calcRehab(sqft, baths, condition);
+  const spread = arv - listPrice - rehab.total;
+  const allin = listPrice + rehab.total;
+  const yld = arv > 0 ? ((estRent * 12) / arv * 100).toFixed(1) : '0.0';
+
+  // Photo
+  const photoMap = { poor:'house+fixer+upper+exterior+distressed', fair:'suburban+house+exterior+1970s', good:'nice+house+exterior+lawn+curb+appeal' };
+  document.getElementById('propImg').src = `https://source.unsplash.com/900x600/?${photoMap[condition]||photoMap.fair}`;
+  document.getElementById('photoArea').style.display = 'block';
+  document.getElementById('emptyLeft').style.display = 'none';
+
+  // Address bar
+  document.getElementById('propAddress').textContent = addr;
+  document.getElementById('domText').textContent = dom !== '—' ? `${dom} days on market` : 'Days on market: n/a';
+  document.getElementById('propSub').innerHTML = `
+    <span>${beds} beds</span><span>${baths} baths</span>
+    <span>${sqft?.toLocaleString()} sqft</span><span>Built ${yearBuilt}</span>`;
+
+  // KPIs
+  document.getElementById('kListPrice').textContent = listPrice ? fmt(listPrice) : 'N/A';
+  document.getElementById('kPriceSub').textContent = aiData.conditionNote || condition;
+  document.getElementById('kArv').textContent = fmt(arv);
+  document.getElementById('kArvSub').textContent = aiData.arvNote || `${comps.length} sold comps`;
+  document.getElementById('kRehab').textContent = fmt(rehab.total);
+  document.getElementById('kRehabSub').textContent = `Condition: ${condition}`;
+  document.getElementById('kSpread').textContent = fmt(spread);
+  document.getElementById('kSpreadCard').className = 'kpi '+(spread>40000?'green':spread>15000?'amber':'red');
+  document.getElementById('kRent').textContent = estRent ? fmt(estRent)+'/mo' : 'N/A';
+  document.getElementById('kYield').textContent = yld+'%';
+  document.getElementById('kYieldCard').className = 'kpi '+(parseFloat(yld)>=7?'green':parseFloat(yld)>=5?'amber':'red');
+
+  // Deal tag
+  const tag = document.getElementById('dealTag');
+  if(spread>50000){tag.textContent='Strong deal';tag.style.background='#EAF5EE';tag.style.color='#1A7A4A'}
+  else if(spread>20000){tag.textContent='Moderate deal';tag.style.background='#FEF4E4';tag.style.color='#A0620A'}
+  else{tag.textContent='Tight / risky';tag.style.background='#FAEAEA';tag.style.color='#C0392B'}
+
+  // Spread bar
+  const pct = arv > 0 ? Math.min(100, Math.round((allin/arv)*100)) : 0;
+  document.getElementById('allinCost').textContent = fmt(allin)+' all-in';
+  document.getElementById('spreadBarFill').style.width = pct+'%';
+  document.getElementById('spreadBarFill').style.background = pct<80?'#1A7A4A':pct<95?'#A0620A':'#C0392B';
+  document.getElementById('barLeft').textContent = `${pct}% of ARV`;
+  document.getElementById('barRight').textContent = fmt(arv);
+  document.getElementById('dealNote').textContent = pct<70?'Excellent margin — well below the 70% rule threshold.'
+    :pct<80?'Good margin — meets the 70% rule for fix-and-flip.'
+    :pct<95?'Tight margin — consider for buy-and-hold only.'
+    :'Negative spread — this deal does not pencil out at current numbers.';
+
+  // Rehab list
+  const rl = document.getElementById('rehabList');
+  rl.innerHTML = rehab.lines.map(l=>`<div class="rehab-item"><span class="rehab-name">${l.label}</span><span class="rehab-val">${fmt(l.val)}</span></div>`).join('');
+  rl.innerHTML += `<div class="rehab-total"><span>Total estimated rehab</span><span>${fmt(rehab.total)}</span></div>`;
+
+  // Comps
+  if(comps.length > 0) {
+    document.getElementById('compsList').innerHTML = comps.map(c => {
+      const ppsf = c.sqft && c.soldPrice ? '$'+Math.round(c.soldPrice/c.sqft)+'/sqft' : '';
+      return `<div class="comp-item">
+        <div class="comp-addr">${c.address} <span class="badge sold">sold</span></div>
+        <div class="comp-detail"><span>${c.beds}bd/${c.baths}ba · ${c.sqft?.toLocaleString()} sqft</span><span>${ppsf}</span></div>
+        <div class="comp-detail" style="margin-top:2px"><span style="color:var(--text-light)">${c.daysAgo} days ago</span><span class="comp-price">${fmt(c.soldPrice)}</span></div>
+      </div>`;
+    }).join('');
+  } else {
+    document.getElementById('compsList').innerHTML = '<div style="font-size:13px;color:var(--text-light);padding:8px 0">No sold comps found within 1 mile in the last 6 months. Try a wider search area.</div>';
+  }
+
+  // Trends
+  document.getElementById('trendList').innerHTML = (aiData.marketTrends||[]).map(t=>`
+    <div class="trend-item">
+      <span class="trend-label">${t.label}</span>
+      <div class="trend-right">
+        <div class="trend-val">${t.value}</div>
+        <div class="trend-chg ${t.dir==='up'?'up':'dn'}">${t.change}</div>
+      </div>
+    </div>`).join('');
+
+  // AI analysis
+  document.getElementById('aiText').textContent = aiData.dealAnalysis || '—';
+
+  // Update source badges
+  document.querySelector('.sources').innerHTML = `
+    <div class="src live">Rentcast: live comps</div>
+    <div class="src live">Rentcast: live rent estimate</div>
+    <div class="src live">AI analysis: live</div>
+    <div class="src">Property details: Estated (not connected)</div>
+    <div class="src">Photo: Street View (not connected)</div>`;
+
+  setStatus(`${beds}bd / ${baths}ba · ${sqft?.toLocaleString()} sqft · Built ${yearBuilt}`);
+}
+
+async function analyze() {
+  const addr = document.getElementById('addr').value.trim();
+  if(!addr){alert('Please enter a property address.');return;}
+
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('rightEmpty').style.display = 'none';
+  document.getElementById('rightContent').style.display = 'flex';
+  document.getElementById('loadBar').style.display = 'block';
+  setStatus('Looking up property…');
+
+  try {
+    // Step 1: Property lookup
+    setStatus('Fetching property details from Rentcast…');
+    let prop = null;
+    try { prop = await fetchRentcastProperty(addr); } catch(e) { console.warn('Property lookup:', e.message); }
+
+    const beds = prop?.bedrooms || 3;
+    const baths = prop?.bathrooms || 2;
+    const sqft = prop?.squareFootage || 1200;
+    const zip = prop?.zipCode || '';
+
+    // Step 2: Comps
+    setStatus('Pulling sold comps (last 6 months)…');
+    let compsRaw = { comparables: [] };
+    try { compsRaw = await fetchRentcastComps(addr, beds, baths, sqft); } catch(e) { console.warn('Comps:', e.message); }
+
+    // Step 3: Rent estimate
+    setStatus('Fetching rent estimate…');
+    let rentRaw = {};
+    try { rentRaw = await fetchRentcastRentEstimate(addr, beds, baths, sqft); } catch(e) { console.warn('Rent:', e.message); }
+
+    // Step 4: Market data
+    setStatus('Fetching market trends…');
+    let marketData = null;
+    if(zip) { try { marketData = await fetchRentcastMarket(zip); } catch(e) { console.warn('Market:', e.message); } }
+
+    // Step 5: AI analysis + ARV + condition
+    setStatus('Running AI deal analysis…');
+    const aiData = await fetchAIAnalysis(addr, prop, compsRaw, rentRaw, marketData);
+
+    // Render everything
+    renderDashboard(addr, prop, compsRaw, rentRaw, aiData);
+
+  } catch(e) {
+    setStatus('Error: ' + e.message);
+    document.getElementById('rightEmpty').style.display = 'flex';
+    document.getElementById('rightContent').style.display = 'none';
+    document.getElementById('emptyLeft').style.display = 'flex';
+    document.getElementById('photoArea').style.display = 'none';
+  }
+
+  document.getElementById('loadBar').style.display = 'none';
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+document.getElementById('addr').addEventListener('keydown', e => { if(e.key==='Enter') analyze(); });
+</script>
+</body>
+</html>
