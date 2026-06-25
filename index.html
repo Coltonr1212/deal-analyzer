@@ -310,35 +310,38 @@ html,body{height:100%;background:var(--cream);color:var(--text);font-family:'Int
   </div>
 </div>
 
+
+</body>
+</html>
 <script>
 const RENTCAST_KEY = 'a31ea82de26d45c0b76a445ffaeb2eca';
 const fmt = n => '$' + Math.round(n).toLocaleString();
 
 const rehabDefs = [
-  {key:'roof',label:'Roof',low:4000,high:14000,u:'lump'},
-  {key:'hvac',label:'HVAC system',low:3500,high:8000,u:'lump'},
-  {key:'kitchen',label:'Kitchen',low:5000,high:18000,u:'lump'},
-  {key:'baths',label:'Bathrooms',low:2500,high:8000,u:'bath'},
-  {key:'floors',label:'Flooring',low:2,high:8,u:'sqft'},
-  {key:'paint',label:'Interior paint',low:1,high:3,u:'sqft'},
-  {key:'electric',label:'Electrical',low:1500,high:6000,u:'lump'},
-  {key:'plumbing',label:'Plumbing',low:500,high:4000,u:'lump'},
-  {key:'exterior',label:'Exterior / landscape',low:1000,high:5000,u:'lump'},
-  {key:'windows',label:'Windows',low:300,high:700,u:'window'},
+  {label:'Roof',low:4000,high:14000,u:'lump'},
+  {label:'HVAC system',low:3500,high:8000,u:'lump'},
+  {label:'Kitchen',low:5000,high:18000,u:'lump'},
+  {label:'Bathrooms',low:2500,high:8000,u:'bath'},
+  {label:'Flooring',low:2,high:8,u:'sqft'},
+  {label:'Interior paint',low:1,high:3,u:'sqft'},
+  {label:'Electrical',low:1500,high:6000,u:'lump'},
+  {label:'Plumbing',low:500,high:4000,u:'lump'},
+  {label:'Exterior / landscape',low:1000,high:5000,u:'lump'},
+  {label:'Windows',low:300,high:700,u:'window'},
 ];
 
 function calcRehab(sqft, baths, condition) {
-  const m = condition==='poor'?0.9:condition==='fair'?0.55:0.25;
+  const m = condition==='poor' ? 0.9 : condition==='fair' ? 0.55 : 0.25;
   let total = 0;
   const lines = [];
   rehabDefs.forEach(r => {
     let est;
-    if(r.u==='sqft') est = Math.round((r.low+(r.high-r.low)*m)*(sqft||1200));
-    else if(r.u==='bath') est = Math.round((r.low+(r.high-r.low)*m)*(baths||2));
-    else if(r.u==='window') est = Math.round((r.low+(r.high-r.low)*m)*8);
-    else est = Math.round(r.low+(r.high-r.low)*m);
+    if (r.u==='sqft')   est = Math.round((r.low+(r.high-r.low)*m) * (sqft||1200));
+    else if (r.u==='bath')   est = Math.round((r.low+(r.high-r.low)*m) * (baths||2));
+    else if (r.u==='window') est = Math.round((r.low+(r.high-r.low)*m) * 8);
+    else                     est = Math.round(r.low+(r.high-r.low)*m);
     total += est;
-    lines.push({label:r.label, val:est});
+    lines.push({label: r.label, val: est});
   });
   return {total, lines};
 }
@@ -350,60 +353,59 @@ function setStatus(msg) {
 async function rentcastFetch(path) {
   const PROXY = 'https://corsproxy.io/?url=';
   const direct = 'https://api.rentcast.io' + path;
-  const headers = { 'X-Api-Key': RENTCAST_KEY, 'Accept': 'application/json' };
+  const headers = {'X-Api-Key': RENTCAST_KEY, 'Accept': 'application/json'};
   let res;
   try {
-    res = await fetch(direct, { headers });
-    if (!res.ok) throw new Error('direct ' + res.status);
+    res = await fetch(direct, {headers});
+    if (!res.ok) throw new Error('status ' + res.status);
+    return res.json();
   } catch(e) {
-    console.warn('Direct Rentcast blocked, using CORS proxy:', e.message);
-    res = await fetch(PROXY + encodeURIComponent(direct), { headers });
+    console.warn('Direct blocked, using proxy:', e.message);
+    res = await fetch(PROXY + encodeURIComponent(direct), {headers});
+    if (!res.ok) throw new Error('Rentcast proxy error ' + res.status);
+    return res.json();
   }
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error('Rentcast ' + res.status + ': ' + body.slice(0,120));
-  }
-  return res.json();
 }
 
-async function fetchRentcastProperty(address) {
-  const data = await rentcastFetch('/v1/properties?address=' + encodeURIComponent(address) + '&limit=1');
-  return Array.isArray(data) ? data[0] : data;
+async function fetchProperty(address) {
+  try {
+    const data = await rentcastFetch('/v1/properties?address=' + encodeURIComponent(address) + '&limit=1');
+    return Array.isArray(data) ? data[0] : data;
+  } catch(e) { console.warn('Property lookup failed:', e.message); return null; }
 }
 
-async function fetchRentcastComps(address, bedrooms, bathrooms, sqft) {
-  const p = new URLSearchParams({
-    address, bedrooms: bedrooms||3, bathrooms: bathrooms||2,
-    squareFootage: sqft||1200, maxRadius: 1, daysOld: 180, limit: 6, compCount: 6
-  });
-  return rentcastFetch('/v1/avm/sale/comparables?' + p);
+async function fetchComps(address, beds, baths, sqft) {
+  try {
+    const p = new URLSearchParams({address, bedrooms: beds||3, bathrooms: baths||2, squareFootage: sqft||1200, maxRadius: 1, daysOld: 180, limit: 6});
+    return await rentcastFetch('/v1/avm/sale/comparables?' + p);
+  } catch(e) { console.warn('Comps failed:', e.message); return {comparables:[]}; }
 }
 
-async function fetchRentcastRentEstimate(address, bedrooms, bathrooms, sqft) {
-  const p = new URLSearchParams({
-    address, bedrooms: bedrooms||3, bathrooms: bathrooms||2, squareFootage: sqft||1200
-  });
-  return rentcastFetch('/v1/avm/rent/long-term?' + p);
+async function fetchRent(address, beds, baths, sqft) {
+  try {
+    const p = new URLSearchParams({address, bedrooms: beds||3, bathrooms: baths||2, squareFootage: sqft||1200});
+    return await rentcastFetch('/v1/avm/rent/long-term?' + p);
+  } catch(e) { console.warn('Rent failed:', e.message); return {}; }
 }
 
-async function fetchRentcastMarket(zipCode) {
-  try { return await rentcastFetch('/v1/markets?zipCode=' + zipCode); }
-  catch(e) { console.warn('Market data unavailable:', e.message); return null; }
+async function fetchMarket(zip) {
+  try { return await rentcastFetch('/v1/markets?zipCode=' + zip); }
+  catch(e) { console.warn('Market failed:', e.message); return null; }
 }
 
-async function fetchAIAnalysis(addr, propData, compsData, rentData, marketData) {
-  const prompt = `You are a real estate investment analyst. Analyze this deal and return ONLY valid JSON, no markdown.
+async function fetchAI(addr, prop, comps, rent, market) {
+  const prompt = `You are a real estate investment analyst. Analyze this deal and return ONLY valid JSON, no markdown, no extra text.
 
-Property: ${addr}
-Details: ${JSON.stringify(propData)}
-Sold comps (last 6 months): ${JSON.stringify(compsData)}
-Rent estimate: ${JSON.stringify(rentData)}
-Market data: ${JSON.stringify(marketData)}
+Address: "${addr}"
+Property details: ${JSON.stringify(prop)}
+Sold comps (last 6 months): ${JSON.stringify(comps)}
+Rent estimate: ${JSON.stringify(rent)}
+Market data: ${JSON.stringify(market)}
 
-Return this exact JSON structure:
+Return exactly this JSON structure:
 {
   "condition": "fair",
-  "conditionNote": "brief note on condition based on year built",
+  "conditionNote": "brief note on condition inferred from year built",
   "arv": 240000,
   "arvNote": "based on X comps averaging $Y/sqft",
   "marketTrends": [
@@ -413,143 +415,114 @@ Return this exact JSON structure:
     {"label":"Active inventory","value":"142 homes","change":"-12%","dir":"dn"},
     {"label":"Price per sqft","value":"$162","change":"+6.1%","dir":"up"}
   ],
-  "dealAnalysis": "3-4 sentence investor-focused analysis covering deal quality, risks, and a clear recommendation."
+  "dealAnalysis": "3-4 sentence investor-focused analysis with clear recommendation."
 }
 
-For ARV: calculate from the actual comps provided, adjusted for sqft. condition must be: poor, fair, or good — infer from year built and property type. Market trends: use the real market data if available, otherwise estimate for the area.`;
+condition must be one of: poor, fair, good. Calculate ARV from the actual comps if available.`;
 
-  // Anthropic doesn't allow direct browser calls — use a relay
-  const AI_PROXY = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages');
+  const body = JSON.stringify({model:'claude-sonnet-4-6', max_tokens:1000, messages:[{role:'user', content:prompt}]});
   let res;
   try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
+    res = await fetch('https://api.anthropic.com/v1/messages', {method:'POST', headers:{'Content-Type':'application/json'}, body});
+    if (!res.ok) throw new Error('direct ' + res.status);
+  } catch(e) {
+    console.warn('Anthropic direct blocked, trying allorigins proxy:', e.message);
+    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages');
+    res = await fetch(proxy, {method:'POST', headers:{'Content-Type':'application/json'}, body});
+  }
+  if (!res.ok) throw new Error('AI call failed: ' + res.status);
   const raw = await res.json();
-  const txt = raw.content.map(c => c.text || '').join('');
-  return JSON.parse(txt.replace(/```json|```/g, '').trim());
+  const txt = raw.content.map(c => c.text||'').join('');
+  return JSON.parse(txt.replace(/```json|```/g,'').trim());
 }
 
 function renderDashboard(addr, prop, compsRaw, rentRaw, aiData) {
-  // Property basics — from Rentcast or AI fallback
-  const beds = prop?.bedrooms || 3;
-  const baths = prop?.bathrooms || 2;
-  const sqft = prop?.squareFootage || 1200;
+  const beds      = prop?.bedrooms || 3;
+  const baths     = prop?.bathrooms || 2;
+  const sqft      = prop?.squareFootage || 1200;
   const yearBuilt = prop?.yearBuilt || '—';
   const listPrice = prop?.price || prop?.lastSalePrice || 0;
-  const dom = prop?.daysOnMarket || prop?.listingDaysOnMarket || '—';
-
-  // Comps — from Rentcast
-  const comps = (compsRaw?.comparables || []).map(c => ({
-    address: c.formattedAddress || c.address,
-    beds: c.bedrooms,
-    baths: c.bathrooms,
-    sqft: c.squareFootage,
-    soldPrice: c.price || c.lastSalePrice || 0,
-    daysAgo: c.daysOld || 0,
-    status: 'sold'
-  }));
-
-  // Rent — from Rentcast
-  const estRent = rentRaw?.rent || rentRaw?.rentEstimate || 0;
-
-  // ARV + analysis from AI
-  const arv = aiData.arv || 0;
+  const dom       = prop?.daysOnMarket || prop?.listingDaysOnMarket || '—';
   const condition = aiData.condition || 'fair';
-
-  // Rehab
-  const rehab = calcRehab(sqft, baths, condition);
-  const spread = arv - listPrice - rehab.total;
-  const allin = listPrice + rehab.total;
-  const yld = arv > 0 ? ((estRent * 12) / arv * 100).toFixed(1) : '0.0';
+  const arv       = aiData.arv || 0;
+  const estRent   = rentRaw?.rent || rentRaw?.rentEstimate || 0;
+  const rehab     = calcRehab(sqft, baths, condition);
+  const spread    = arv - listPrice - rehab.total;
+  const allin     = listPrice + rehab.total;
+  const yld       = arv > 0 ? ((estRent*12)/arv*100).toFixed(1) : '0.0';
+  const comps     = (compsRaw?.comparables || []);
 
   // Photo
-  const photoMap = { poor:'house+fixer+upper+exterior+distressed', fair:'suburban+house+exterior+1970s', good:'nice+house+exterior+lawn+curb+appeal' };
+  const photoMap = {poor:'house+fixer+upper+exterior+distressed', fair:'suburban+house+exterior+brick', good:'nice+house+exterior+lawn'};
   document.getElementById('propImg').src = `https://source.unsplash.com/900x600/?${photoMap[condition]||photoMap.fair}`;
   document.getElementById('photoArea').style.display = 'block';
   document.getElementById('emptyLeft').style.display = 'none';
-
-  // Address bar
   document.getElementById('propAddress').textContent = addr;
   document.getElementById('domText').textContent = dom !== '—' ? `${dom} days on market` : 'Days on market: n/a';
-  document.getElementById('propSub').innerHTML = `
-    <span>${beds} beds</span><span>${baths} baths</span>
-    <span>${sqft?.toLocaleString()} sqft</span><span>Built ${yearBuilt}</span>`;
+  document.getElementById('propSub').innerHTML = `<span>${beds} beds</span><span>${baths} baths</span><span>${sqft?.toLocaleString()} sqft</span><span>Built ${yearBuilt}</span>`;
 
   // KPIs
   document.getElementById('kListPrice').textContent = listPrice ? fmt(listPrice) : 'N/A';
-  document.getElementById('kPriceSub').textContent = aiData.conditionNote || condition;
-  document.getElementById('kArv').textContent = fmt(arv);
-  document.getElementById('kArvSub').textContent = aiData.arvNote || `${comps.length} sold comps`;
-  document.getElementById('kRehab').textContent = fmt(rehab.total);
-  document.getElementById('kRehabSub').textContent = `Condition: ${condition}`;
-  document.getElementById('kSpread').textContent = fmt(spread);
-  document.getElementById('kSpreadCard').className = 'kpi '+(spread>40000?'green':spread>15000?'amber':'red');
-  document.getElementById('kRent').textContent = estRent ? fmt(estRent)+'/mo' : 'N/A';
-  document.getElementById('kYield').textContent = yld+'%';
-  document.getElementById('kYieldCard').className = 'kpi '+(parseFloat(yld)>=7?'green':parseFloat(yld)>=5?'amber':'red');
+  document.getElementById('kPriceSub').textContent  = aiData.conditionNote || condition;
+  document.getElementById('kArv').textContent       = fmt(arv);
+  document.getElementById('kArvSub').textContent    = aiData.arvNote || `${comps.length} sold comps`;
+  document.getElementById('kRehab').textContent     = fmt(rehab.total);
+  document.getElementById('kRehabSub').textContent  = `Condition: ${condition}`;
+  document.getElementById('kSpread').textContent    = fmt(spread);
+  document.getElementById('kSpreadCard').className  = 'kpi ' + (spread>40000?'green':spread>15000?'amber':'red');
+  document.getElementById('kRent').textContent      = estRent ? fmt(estRent)+'/mo' : 'N/A';
+  document.getElementById('kYield').textContent     = yld + '%';
+  document.getElementById('kYieldCard').className   = 'kpi ' + (parseFloat(yld)>=7?'green':parseFloat(yld)>=5?'amber':'red');
 
   // Deal tag
   const tag = document.getElementById('dealTag');
-  if(spread>50000){tag.textContent='Strong deal';tag.style.background='#EAF5EE';tag.style.color='#1A7A4A'}
-  else if(spread>20000){tag.textContent='Moderate deal';tag.style.background='#FEF4E4';tag.style.color='#A0620A'}
-  else{tag.textContent='Tight / risky';tag.style.background='#FAEAEA';tag.style.color='#C0392B'}
+  if (spread>50000)      { tag.textContent='Strong deal';   tag.style.background='#EAF5EE'; tag.style.color='#1A7A4A'; }
+  else if (spread>20000) { tag.textContent='Moderate deal'; tag.style.background='#FEF4E4'; tag.style.color='#A0620A'; }
+  else                   { tag.textContent='Tight / risky'; tag.style.background='#FAEAEA'; tag.style.color='#C0392B'; }
 
   // Spread bar
   const pct = arv > 0 ? Math.min(100, Math.round((allin/arv)*100)) : 0;
-  document.getElementById('allinCost').textContent = fmt(allin)+' all-in';
-  document.getElementById('spreadBarFill').style.width = pct+'%';
+  document.getElementById('allinCost').textContent       = fmt(allin) + ' all-in';
+  document.getElementById('spreadBarFill').style.width   = pct + '%';
   document.getElementById('spreadBarFill').style.background = pct<80?'#1A7A4A':pct<95?'#A0620A':'#C0392B';
-  document.getElementById('barLeft').textContent = `${pct}% of ARV`;
-  document.getElementById('barRight').textContent = fmt(arv);
-  document.getElementById('dealNote').textContent = pct<70?'Excellent margin — well below the 70% rule threshold.'
-    :pct<80?'Good margin — meets the 70% rule for fix-and-flip.'
-    :pct<95?'Tight margin — consider for buy-and-hold only.'
-    :'Negative spread — this deal does not pencil out at current numbers.';
+  document.getElementById('barLeft').textContent         = `${pct}% of ARV`;
+  document.getElementById('barRight').textContent        = fmt(arv);
+  document.getElementById('dealNote').textContent        =
+    pct<70 ? 'Excellent margin — well below the 70% rule threshold.' :
+    pct<80 ? 'Good margin — meets the 70% rule for fix-and-flip.' :
+    pct<95 ? 'Tight margin — consider for buy-and-hold only.' :
+             'Negative spread — this deal does not pencil out at current numbers.';
 
   // Rehab list
-  const rl = document.getElementById('rehabList');
-  rl.innerHTML = rehab.lines.map(l=>`<div class="rehab-item"><span class="rehab-name">${l.label}</span><span class="rehab-val">${fmt(l.val)}</span></div>`).join('');
-  rl.innerHTML += `<div class="rehab-total"><span>Total estimated rehab</span><span>${fmt(rehab.total)}</span></div>`;
+  document.getElementById('rehabList').innerHTML =
+    rehab.lines.map(l => `<div class="rehab-item"><span class="rehab-name">${l.label}</span><span class="rehab-val">${fmt(l.val)}</span></div>`).join('') +
+    `<div class="rehab-total"><span>Total estimated rehab</span><span>${fmt(rehab.total)}</span></div>`;
 
   // Comps
-  if(comps.length > 0) {
-    document.getElementById('compsList').innerHTML = comps.map(c => {
-      const ppsf = c.sqft && c.soldPrice ? '$'+Math.round(c.soldPrice/c.sqft)+'/sqft' : '';
-      return `<div class="comp-item">
-        <div class="comp-addr">${c.address} <span class="badge sold">sold</span></div>
-        <div class="comp-detail"><span>${c.beds}bd/${c.baths}ba · ${c.sqft?.toLocaleString()} sqft</span><span>${ppsf}</span></div>
-        <div class="comp-detail" style="margin-top:2px"><span style="color:var(--text-light)">${c.daysAgo} days ago</span><span class="comp-price">${fmt(c.soldPrice)}</span></div>
-      </div>`;
-    }).join('');
-  } else {
-    document.getElementById('compsList').innerHTML = '<div style="font-size:13px;color:var(--text-light);padding:8px 0">No sold comps found within 1 mile in the last 6 months. Try a wider search area.</div>';
-  }
+  document.getElementById('compsList').innerHTML = comps.length > 0
+    ? comps.map(c => {
+        const ppsf = c.sqft && c.price ? '$'+Math.round(c.price/c.sqft)+'/sqft' : '';
+        return `<div class="comp-item">
+          <div class="comp-addr">${c.formattedAddress||c.address||'—'} <span class="badge sold">sold</span></div>
+          <div class="comp-detail"><span>${c.bedrooms||'?'}bd/${c.bathrooms||'?'}ba · ${(c.squareFootage||0).toLocaleString()} sqft</span><span>${ppsf}</span></div>
+          <div class="comp-detail" style="margin-top:2px"><span style="color:var(--text-light)">${c.daysOld||0} days ago</span><span class="comp-price">${fmt(c.price||0)}</span></div>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:13px;color:var(--text-light);padding:8px 0">No sold comps found within 1 mile in the last 6 months.</div>';
 
   // Trends
-  document.getElementById('trendList').innerHTML = (aiData.marketTrends||[]).map(t=>`
-    <div class="trend-item">
-      <span class="trend-label">${t.label}</span>
-      <div class="trend-right">
-        <div class="trend-val">${t.value}</div>
-        <div class="trend-chg ${t.dir==='up'?'up':'dn'}">${t.change}</div>
-      </div>
-    </div>`).join('');
+  document.getElementById('trendList').innerHTML = (aiData.marketTrends||[]).map(t =>
+    `<div class="trend-item"><span class="trend-label">${t.label}</span><div class="trend-right"><div class="trend-val">${t.value}</div><div class="trend-chg ${t.dir==='up'?'up':'dn'}">${t.change}</div></div></div>`
+  ).join('');
 
   // AI analysis
   document.getElementById('aiText').textContent = aiData.dealAnalysis || '—';
 
-  // Update source badges
+  // Sources
   document.querySelector('.sources').innerHTML = `
     <div class="src live">Rentcast: live comps</div>
     <div class="src live">Rentcast: live rent estimate</div>
     <div class="src live">AI analysis: live</div>
-    <div class="src">Property details: Estated (not connected)</div>
     <div class="src">Photo: Street View (not connected)</div>`;
 
   setStatus(`${beds}bd / ${baths}ba · ${sqft?.toLocaleString()} sqft · Built ${yearBuilt}`);
@@ -557,7 +530,7 @@ function renderDashboard(addr, prop, compsRaw, rentRaw, aiData) {
 
 async function analyze() {
   const addr = document.getElementById('addr').value.trim();
-  if(!addr){alert('Please enter a property address.');return;}
+  if (!addr) { alert('Please enter a property address.'); return; }
 
   document.getElementById('analyzeBtn').disabled = true;
   document.getElementById('rightEmpty').style.display = 'none';
@@ -566,51 +539,38 @@ async function analyze() {
   setStatus('Looking up property…');
 
   try {
-    // Step 1: Property lookup
-    setStatus('Fetching property details from Rentcast…');
-    let prop = null;
-    try { prop = await fetchRentcastProperty(addr); } catch(e) { console.warn('Property lookup:', e.message); }
+    setStatus('Fetching property details…');
+    const prop = await fetchProperty(addr);
 
-    const beds = prop?.bedrooms || 3;
+    const beds  = prop?.bedrooms || 3;
     const baths = prop?.bathrooms || 2;
-    const sqft = prop?.squareFootage || 1200;
-    const zip = prop?.zipCode || '';
+    const sqft  = prop?.squareFootage || 1200;
+    const zip   = prop?.zipCode || '';
 
-    // Step 2: Comps
-    setStatus('Pulling sold comps (last 6 months)…');
-    let compsRaw = { comparables: [] };
-    try { compsRaw = await fetchRentcastComps(addr, beds, baths, sqft); } catch(e) { console.warn('Comps:', e.message); }
+    setStatus('Pulling sold comps…');
+    const compsRaw = await fetchComps(addr, beds, baths, sqft);
 
-    // Step 3: Rent estimate
     setStatus('Fetching rent estimate…');
-    let rentRaw = {};
-    try { rentRaw = await fetchRentcastRentEstimate(addr, beds, baths, sqft); } catch(e) { console.warn('Rent:', e.message); }
+    const rentRaw = await fetchRent(addr, beds, baths, sqft);
 
-    // Step 4: Market data
     setStatus('Fetching market trends…');
-    let marketData = null;
-    if(zip) { try { marketData = await fetchRentcastMarket(zip); } catch(e) { console.warn('Market:', e.message); } }
+    const marketData = zip ? await fetchMarket(zip) : null;
 
-    // Step 5: AI analysis + ARV + condition
     setStatus('Running AI deal analysis…');
-    const aiData = await fetchAIAnalysis(addr, prop, compsRaw, rentRaw, marketData);
+    const aiData = await fetchAI(addr, prop, compsRaw, rentRaw, marketData);
 
-    // Render everything
     renderDashboard(addr, prop, compsRaw, rentRaw, aiData);
 
   } catch(e) {
     setStatus('Error: ' + e.message);
-    document.getElementById('rightEmpty').style.display = 'flex';
-    document.getElementById('rightContent').style.display = 'none';
-    document.getElementById('emptyLeft').style.display = 'flex';
-    document.getElementById('photoArea').style.display = 'none';
+    console.error(e);
   }
 
   document.getElementById('loadBar').style.display = 'none';
   document.getElementById('analyzeBtn').disabled = false;
 }
 
-document.getElementById('addr').addEventListener('keydown', e => { if(e.key==='Enter') analyze(); });
+document.getElementById('addr').addEventListener('keydown', e => { if (e.key==='Enter') analyze(); });
 </script>
 </body>
 </html>
